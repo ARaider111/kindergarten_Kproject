@@ -1,10 +1,12 @@
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
-from .serializers import UserSerializer
-from .models import User
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from django.db import transaction
+from .models import User, Employee
+from .serializers import UserSerializer, EmployeeSerializer, ParentSerializer
 
 @api_view(['POST'])
 def register_user(request):
@@ -23,3 +25,54 @@ def user_login(request):
         token, created = Token.objects.get_or_create(user=user)
         return Response({'token': token.key}, status=status.HTTP_200_OK)
     return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+# views.py
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def add_employee(request):
+    if request.user.role != 'Admin':
+        return Response({'error': 'Доступ запрещён, требуется роль администратора'}, status=status.HTTP_403_FORBIDDEN)
+
+    user_data = request.data.get('user')
+    employee_data = request.data.get('employee')
+
+    user_serializer = UserSerializer(data=user_data)
+    if not user_serializer.is_valid():
+        return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    user = user_serializer.save()
+
+    employee_serializer = EmployeeSerializer(data=employee_data, context={'user': user})
+    if not employee_serializer.is_valid():
+        transaction.set_rollback(True)
+        return Response(employee_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    employee_serializer.save()
+
+    return Response({'message': 'Сотрудник успешно добавлен'}, status=status.HTTP_201_CREATED)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def add_parent(request):
+    # Проверка роли администратора
+    if request.user.role != 'Admin':
+        return Response({'error': 'Доступ запрещён, требуется роль администратора'}, status=status.HTTP_403_FORBIDDEN)
+
+    user_data = request.data.get('user')
+    parent_data = request.data.get('parent')
+
+    user_serializer = UserSerializer(data=user_data)
+    if not user_serializer.is_valid():
+        return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    user = user_serializer.save()
+
+    parent_serializer = ParentSerializer(data=parent_data, context={'user': user})
+    if not parent_serializer.is_valid():
+        transaction.set_rollback(True)
+        return Response(parent_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    parent_serializer.save()
+
+    return Response({'message': 'Родитель успешно добавлен'}, status=status.HTTP_201_CREATED)
