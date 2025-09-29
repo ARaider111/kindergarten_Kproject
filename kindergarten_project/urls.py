@@ -16,7 +16,10 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from kindergarten_app_.views import register_user, user_login
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/register/', register_user, name='register'),
+    path('api/login/', user_login, name='login'),
 ]

@@ -1,6 +1,6 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.contrib.auth.hashers import make_password, check_password
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 
 # Enum для квалификации сотрудников
 class QualificationEmployees(models.TextChoices):
@@ -27,18 +27,34 @@ class Roles(models.TextChoices):
     EMPLOYEE = 'Employee'
     PARENT = 'Parent'
 
-class User(models.Model):
+class UserManager(BaseUserManager):
+    def create_user(self, username, password=None, **extra_fields):
+        if not username:
+            raise ValueError('Users must have a username')
+        user = self.model(username=username, **extra_fields)
+        user.set_password(password)   # хеширование пароля
+        user.save()
+        return user
+
+    def create_superuser(self, username, password, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+
+        return self.create_user(username, password, **extra_fields)
+
+class User(AbstractBaseUser, PermissionsMixin):
     username = models.CharField(max_length=50, unique=True)
-    password = models.CharField(max_length=128)  # здесь будем хранить хеш
     role = models.CharField(max_length=10, choices=Roles.choices)
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
 
-    def set_password(self, raw_password):
-        """Хеширует и сохраняет пароль."""
-        self.password = make_password(raw_password)
+    objects = UserManager()
 
-    def check_password(self, raw_password):
-        """Проверяет пароль на соответствие хешу."""
-        return check_password(raw_password, self.password)
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = []
+
+    def __str__(self):
+        return self.username
 
 class Parent(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
