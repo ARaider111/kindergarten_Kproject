@@ -5,8 +5,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from .models import User, Employee
+from .models import User, Employee, Parent
 from .serializers import UserSerializer, EmployeeSerializer, ParentSerializer
+from django.shortcuts import get_object_or_404
 
 @api_view(['POST'])
 def register_user(request):
@@ -76,3 +77,40 @@ def add_parent(request):
     parent_serializer.save()
 
     return Response({'message': 'Родитель успешно добавлен'}, status=status.HTTP_201_CREATED)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_parents(request):
+    if request.user.role != 'Admin':
+        return Response({'error': 'Доступ запрещён, требуется роль администратора'}, status=status.HTTP_403_FORBIDDEN)
+
+    parents = Parent.objects.all()
+    serializer = ParentSerializer(parents, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_employees(request):
+    # Разрешаем доступ для ролей Admin или Employee
+    if request.user.role not in ['Admin', 'Employee']:
+        return Response({'error': 'Доступ запрещён'}, status=status.HTTP_403_FORBIDDEN)
+
+    employees = Employee.objects.all()
+    serializer = EmployeeSerializer(employees, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_parent_by_user_id(request, user_id):
+    if request.user.role not in ['Admin', 'Employee']:
+        return Response({'error': 'Доступ запрещён'}, status=status.HTTP_403_FORBIDDEN)
+
+    parent = get_object_or_404(Parent, user__id=user_id)
+    serializer = ParentSerializer(parent)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_employee_by_user_id(request, user_id):
+    employee = get_object_or_404(Employee, user__id=user_id)
+    serializer = EmployeeSerializer(employee)
+    return Response(serializer.data, status=status.HTTP_200_OK)

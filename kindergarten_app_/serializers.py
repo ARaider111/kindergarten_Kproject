@@ -13,9 +13,12 @@ class UserSerializer(serializers.ModelSerializer):
         return user
 
 class EmployeeSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    gender = serializers.SerializerMethodField()
+
     class Meta:
         model = Employee
-        fields = ['fname', 'lname', 'patronymic', 'gender', 'birthday',
+        fields = ['user_id', 'fname', 'lname', 'patronymic', 'gender', 'birthday',
                   'phone_number', 'qualification', 'work_experience']
 
     def create(self, validated_data):
@@ -23,11 +26,14 @@ class EmployeeSerializer(serializers.ModelSerializer):
         if 'user' in validated_data:
             validated_data.pop('user')
         return Employee.objects.create(user=user, **validated_data)
+    def get_gender(self, obj):
+        return "woman" if obj.gender else "man"
 
 class ParentSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
     class Meta:
         model = Parent
-        fields = ['fname', 'lname', 'patronymic', 'phone_number']
+        fields = ['user_id', 'fname', 'lname', 'patronymic', 'phone_number']
 
     def create(self, validated_data):
         user = self.context.get('user')

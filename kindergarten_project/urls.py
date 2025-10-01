@@ -16,7 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from kindergarten_app_.views import register_user, user_login, add_employee, add_parent
+from kindergarten_app_.views import register_user, user_login, add_employee, \
+    add_parent, list_parents, list_employees, get_parent_by_user_id, get_employee_by_user_id
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -24,4 +26,8 @@ urlpatterns = [
     path('api/login/', user_login, name='login'),
     path('api/employee/add/', add_employee, name='add_employee'),
     path('api/parent/add/', add_parent, name='add_parent'),
+    path('api/parent/list/', list_parents, name='list_parents'),
+    path('api/employee/list/', list_employees, name='list_employees'),
+    path('api/parent/list/<int:user_id>/', get_parent_by_user_id, name='get_parent_by_user_id'),
+    path('api/employee/list/<int:user_id>/', get_employee_by_user_id, name='get_employee_by_user_id'),
 ]
