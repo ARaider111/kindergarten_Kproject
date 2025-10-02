@@ -16,8 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from kindergarten_app_.views import register_user, user_login, add_employee, \
-    add_parent, list_parents, list_employees, get_parent_by_user_id, get_employee_by_user_id
+from kindergarten_app_.views import register_user, user_login, add_employee, get_educational_program_by_id, \
+    add_parent, list_parents, list_employees, get_parent_by_user_id, create_group, \
+    get_employee_by_user_id, create_educational_program, list_groups, get_group_by_id, edit_group
 
 
 urlpatterns = [
@@ -30,4 +31,10 @@ urlpatterns = [
     path('api/employee/list/', list_employees, name='list_employees'),
     path('api/parent/list/<int:user_id>/', get_parent_by_user_id, name='get_parent_by_user_id'),
     path('api/employee/list/<int:user_id>/', get_employee_by_user_id, name='get_employee_by_user_id'),
+    path('api/education_program/create/', create_educational_program, name='create_educational_program'),
+    path('api/education_program/<int:program_id>/', get_educational_program_by_id, name='get_education_program_by_id'),
+    path('api/group/create/', create_group, name='create_group'),
+    path('api/group/list/', list_groups, name='list_groups'),
+    path('api/group/<int:group_id>/', get_group_by_id, name='get_group_by_id'),
+    path('api/group/edit/<int:group_id>/', edit_group, name='edit_group'),
 ]

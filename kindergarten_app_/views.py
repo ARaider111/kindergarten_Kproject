@@ -5,8 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from .models import User, Employee, Parent
-from .serializers import UserSerializer, EmployeeSerializer, ParentSerializer
+from .models import User, Employee, Parent, EducationalProgram, Group
+from .serializers import UserSerializer, EmployeeSerializer, ParentSerializer, EducationalProgramSerializer, GroupSerializer
 from django.shortcuts import get_object_or_404
 
 @api_view(['POST'])
@@ -114,3 +114,67 @@ def get_employee_by_user_id(request, user_id):
     employee = get_object_or_404(Employee, user__id=user_id)
     serializer = EmployeeSerializer(employee)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_educational_program(request):
+    if request.user.role != 'Employee':
+        return Response({'error': 'Доступ запрещён. Только сотрудник может создавать программы.'}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = EducationalProgramSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    else:
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_educational_program_by_id(request, program_id):
+    program = get_object_or_404(EducationalProgram, id=program_id)
+    serializer = EducationalProgramSerializer(program)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_group(request):
+    if request.user.role != 'Admin':
+        return Response({'error': 'Доступ запрещён. Только администраторы могут создавать группы.'}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = GroupSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_groups(request):
+    if request.user.role not in ['Admin', 'Employee']:
+        return Response({'error': 'Доступ запрещен'}, status=status.HTTP_403_FORBIDDEN)
+
+    groups = Group.objects.all()
+    serializer = GroupSerializer(groups, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_group_by_id(request, group_id):
+    group = get_object_or_404(Group, id=group_id)
+    serializer = GroupSerializer(group)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def edit_group(request, group_id):
+    if request.user.role != 'Admin':
+        return Response({'error': 'Доступ запрещён. Только администраторы могут редактировать группы.'}, status=status.HTTP_403_FORBIDDEN)
+
+    group = get_object_or_404(Group, id=group_id)
+    partial = request.method == 'PATCH'  # Позволяет частичное обновление
+    serializer = GroupSerializer(group, data=request.data, partial=partial)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

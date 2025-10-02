@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Employee, Parent
+from .models import User, Employee, Parent, EducationalProgram, Group
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -38,3 +38,13 @@ class ParentSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = self.context.get('user')
         return Parent.objects.create(user=user, **validated_data)
+
+class EducationalProgramSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EducationalProgram
+        fields = '__all__'
+
+class GroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Group
+        fields = '__all__'
