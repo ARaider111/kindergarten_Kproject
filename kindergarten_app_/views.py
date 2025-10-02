@@ -6,7 +6,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
 from .models import User, Employee, Parent, EducationalProgram, Group
-from .serializers import UserSerializer, EmployeeSerializer, ParentSerializer, EducationalProgramSerializer, GroupSerializer
+from .serializers import UserSerializer, EmployeeSerializer,  \
+    ParentSerializer, EducationalProgramSerializer, GroupSerializer
 from django.shortcuts import get_object_or_404
 
 @api_view(['POST'])
@@ -44,20 +45,21 @@ def add_employee(request):
         return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     user = user_serializer.save()
 
-    employee_serializer = EmployeeSerializer(data=employee_data, context={'user': user})
+    employee_serializer = EmployeeSerializer(data=employee_data)
     if not employee_serializer.is_valid():
         transaction.set_rollback(True)
         return Response(employee_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    employee_serializer.save()
+    employee = employee_serializer.save(user=user)
 
-    return Response({'message': 'Сотрудник успешно добавлен'}, status=status.HTTP_201_CREATED)
+    result_serializer = EmployeeSerializer(employee)
+    return Response(result_serializer.data, status=status.HTTP_201_CREATED)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @transaction.atomic
 def add_parent(request):
-    # Проверка роли администратора
     if request.user.role != 'Admin':
         return Response({'error': 'Доступ запрещён, требуется роль администратора'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -74,9 +76,12 @@ def add_parent(request):
         transaction.set_rollback(True)
         return Response(parent_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    parent_serializer.save()
+    parent = parent_serializer.save()
 
-    return Response({'message': 'Родитель успешно добавлен'}, status=status.HTTP_201_CREATED)
+    # Сериализуем и возвращаем данные добавленного родителя
+    output_serializer = ParentSerializer(parent)
+    return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -108,12 +113,43 @@ def get_parent_by_user_id(request, user_id):
     parent = get_object_or_404(Parent, user__id=user_id)
     serializer = ParentSerializer(parent)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def edit_parent(request, parent_id):
+    if request.user.role != 'Admin':
+        return Response({'error': 'Доступ запрещён. Только администраторы могут редактировать родителя.'}, status=status.HTTP_403_FORBIDDEN)
+
+    parent = get_object_or_404(Parent, id=parent_id)
+    partial = request.method == 'PATCH'
+    serializer = ParentSerializer(parent, data=request.data, partial=partial)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_employee_by_user_id(request, user_id):
     employee = get_object_or_404(Employee, user__id=user_id)
     serializer = EmployeeSerializer(employee)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def edit_employee(request, employee_id):
+    if request.user.role != 'Admin':
+        return Response({'error': 'Доступ запрещён. Только администраторы могут редактировать данные сотрудников.'}, status=status.HTTP_403_FORBIDDEN)
+
+    employee = get_object_or_404(Employee, id=employee_id)
+    partial = request.method == 'PATCH'
+    serializer = EmployeeSerializer(employee, data=request.data, partial=partial)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -178,3 +214,4 @@ def edit_group(request, group_id):
         serializer.save()
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+

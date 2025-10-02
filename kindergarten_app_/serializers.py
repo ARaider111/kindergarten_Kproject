@@ -14,26 +14,22 @@ class UserSerializer(serializers.ModelSerializer):
 
 class EmployeeSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source='user.id', read_only=True)
-    gender = serializers.SerializerMethodField()
+    gender = serializers.BooleanField(write_only=True)  # Принимается при создании/обновлении, но не выводится
+    gender_display = serializers.SerializerMethodField(read_only=True)  # Выводится только для чтения
 
     class Meta:
         model = Employee
-        fields = ['user_id', 'fname', 'lname', 'patronymic', 'gender', 'birthday',
-                  'phone_number', 'qualification', 'work_experience']
+        fields = ['id', 'user_id', 'fname', 'lname', 'patronymic', 'gender', 'gender_display',
+                  'birthday', 'phone_number', 'qualification', 'work_experience']
 
-    def create(self, validated_data):
-        user = self.context.get('user')  # получаем user из контекста сериализатора
-        if 'user' in validated_data:
-            validated_data.pop('user')
-        return Employee.objects.create(user=user, **validated_data)
-    def get_gender(self, obj):
+    def get_gender_display(self, obj):
         return "woman" if obj.gender else "man"
 
 class ParentSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source='user.id', read_only=True)
     class Meta:
         model = Parent
-        fields = ['user_id', 'fname', 'lname', 'patronymic', 'phone_number']
+        fields = ['id', 'user_id', 'fname', 'lname', 'patronymic', 'phone_number']
 
     def create(self, validated_data):
         user = self.context.get('user')
