@@ -5,9 +5,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from .models import User, Employee, Parent, EducationalProgram, Group
+from .models import User, Employee, Parent, EducationalProgram, Group, Child, ParentsChilds
 from .serializers import UserSerializer, EmployeeSerializer,  \
-    ParentSerializer, EducationalProgramSerializer, GroupSerializer
+    ParentSerializer, EducationalProgramSerializer, GroupSerializer, ChildSerializer, MedicalContraindicationsChildSerializer
 from django.shortcuts import get_object_or_404
 
 @api_view(['POST'])
@@ -215,3 +215,74 @@ def edit_group(request, group_id):
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def add_child(request):
+    if request.user.role != 'Admin':
+        return Response({'error': 'Доступ запрещён, требуется роль администратора'}, status=status.HTTP_403_FORBIDDEN)
+
+    child_data = request.data.get('child')
+    contraindications_data = request.data.get('medical_contraindications', [])
+    parent_id = request.data.get('parent_id')
+
+    if not parent_id:
+        return Response({'error': 'parent_id обязателен'}, status=status.HTTP_400_BAD_REQUEST)
+
+    child_serializer = ChildSerializer(data=child_data)
+    if not child_serializer.is_valid():
+        return Response(child_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    child = child_serializer.save()
+
+    # Связываем с родителем
+    try:
+        parent = Parent.objects.get(id=parent_id)
+    except Parent.DoesNotExist:
+        return Response({'error': 'Родитель с таким id не найден'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Проверяем, что такая связь уникальна, либо создаём новую
+    ParentsChilds.objects.get_or_create(parent=parent, child=child)
+
+    # Сохраняем медицинские противопоказания если переданы
+    for contraindication_data in contraindications_data:
+        contraindication_data['child'] = child.id  # Связываем противопоказание с ребенком
+        contraindication_serializer = MedicalContraindicationsChildSerializer(data=contraindication_data)
+        if contraindication_serializer.is_valid():
+            contraindication_serializer.save()
+        else:
+            transaction.set_rollback(True)
+            return Response(contraindication_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    output_serializer = ChildSerializer(child)
+    return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_child(request, child_id):
+    if request.user.role not in ['Admin', 'Employee']:
+        return Response({'error': 'Доступ запрещён'}, status=status.HTTP_403_FORBIDDEN)
+
+    child = get_object_or_404(Child, id=child_id)
+    serializer = ChildSerializer(child)
+    return Response(serializer.data)
+
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def edit_child(request, child_id):
+    if request.user.role != 'Admin':
+        return Response({'error': 'Доступ запрещён'}, status=status.HTTP_403_FORBIDDEN)
+
+    child = get_object_or_404(Child, id=child_id)
+
+    partial = request.method == 'PATCH'  # поддержка частичного обновления
+
+    serializer = ChildSerializer(child, data=request.data, partial=partial)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

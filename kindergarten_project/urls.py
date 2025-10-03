@@ -17,8 +17,9 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from kindergarten_app_.views import register_user, user_login, add_employee, get_educational_program_by_id, \
-    add_parent, list_parents, list_employees, get_parent_by_user_id, create_group, edit_parent, \
-    get_employee_by_user_id, create_educational_program, list_groups, get_group_by_id, edit_group, edit_employee
+    add_parent, list_parents, list_employees, get_parent_by_user_id, create_group, edit_parent, add_child, \
+    get_employee_by_user_id, create_educational_program, list_groups, get_group_by_id, edit_group, edit_employee, \
+    get_child, edit_child
 
 
 urlpatterns = [
@@ -39,4 +40,7 @@ urlpatterns = [
     path('api/group/list/', list_groups, name='list_groups'),
     path('api/group/<int:group_id>/', get_group_by_id, name='get_group_by_id'),
     path('api/group/edit/<int:group_id>/', edit_group, name='edit_group'),
+    path('api/child/add/', add_child, name='add_child'),
+    path('api/child/<int:child_id>/', get_child, name='get_child'),
+    path('api/child/edit/<int:child_id>/', edit_child, name='edit_child'),
 ]

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Employee, Parent, EducationalProgram, Group
+from .models import User, Employee, Parent, EducationalProgram, Group, Child, MedicalContraindicationsChild
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -44,3 +44,31 @@ class GroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
         fields = '__all__'
+
+class MedicalContraindicationsChildSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MedicalContraindicationsChild
+        fields = ['C', 'description', 'child']
+
+class ChildSerializer(serializers.ModelSerializer):
+    gender_display = serializers.SerializerMethodField()
+    gender = serializers.BooleanField(write_only=True)
+    medical_contraindications = MedicalContraindicationsChildSerializer(
+        many=True, read_only=True, source='medicalcontraindicationschild_set'
+    )
+    group_name = serializers.ReadOnlyField(source='group.name')
+
+    # добавляем связанных родителей, связанных через ParentsChilds
+    parents = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Child
+        fields = ['id', 'fname', 'lname', 'patronymic', 'gender', 'gender_display', 'birthday',
+                  'group', 'group_name', 'transfer_date', 'medical_contraindications', 'parents']
+
+    def get_gender_display(self, obj):
+        return "woman" if obj.gender else "man"
+
+    def get_parents(self, obj):
+        parents_qs = Parent.objects.filter(parentschilds__child=obj)
+        return ParentSerializer(parents_qs, many=True).data
