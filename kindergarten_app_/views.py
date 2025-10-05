@@ -5,8 +5,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from .models import User, Employee, Parent, EducationalProgram, Group, Child, ParentsChilds
-from .serializers import UserSerializer, EmployeeSerializer,  \
+from .models import User, Employee, Parent, EducationalProgram, Group, Child, ParentsChilds, \
+    AssignedEmployees, QualificationEmployees, ListsEvents, Event
+from .serializers import UserSerializer, EmployeeSerializer, AssignedEmployeesSerializer, EventSerializer,\
     ParentSerializer, EducationalProgramSerializer, GroupSerializer, ChildSerializer, MedicalContraindicationsChildSerializer
 from django.shortcuts import get_object_or_404
 
@@ -280,6 +281,122 @@ def edit_child(request, child_id):
     partial = request.method == 'PATCH'  # поддержка частичного обновления
 
     serializer = ChildSerializer(child, data=request.data, partial=partial)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def assign_employee_role(request):
+    if request.user.role != 'Admin':
+        return Response({'error': 'Доступ запрещён'}, status=status.HTTP_403_FORBIDDEN)
+
+    group_id = request.data.get('group_id')
+    employee_id = request.data.get('employee_id')
+    role = request.data.get('role')
+
+    if not all([group_id, employee_id, role]):
+        return Response({'error': 'Параметры group_id, employee_id и role обязательны'}, status=status.HTTP_400_BAD_REQUEST)
+
+    valid_roles = [choice[0] for choice in QualificationEmployees.choices]
+    if role not in valid_roles:
+        return Response({'error': 'Недопустимое значение роли'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        group = Group.objects.get(id=group_id)
+        employee = Employee.objects.get(id=employee_id)
+    except (Group.DoesNotExist, Employee.DoesNotExist):
+        return Response({'error': 'Группа или сотрудник с таким id не найдены'}, status=status.HTTP_400_BAD_REQUEST)
+
+    assigned, created = AssignedEmployees.objects.update_or_create(
+        group=group,
+        employee=employee,
+        defaults={'role': role},
+    )
+
+    serializer = AssignedEmployeesSerializer(assigned)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def add_event(request):
+    if request.user.role not in ['Admin', 'Employee']:
+        return Response({'error': 'Доступ запрещён'}, status=status.HTTP_403_FORBIDDEN)
+
+    data = request.data
+    educational_program_id = data.get('educational_program_id')
+    event_data = data.get('event')
+
+    if not educational_program_id or not event_data:
+        return Response({'error': 'Необходимо указать educational_program_id и данные мероприятия'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        educational_program = EducationalProgram.objects.get(id=educational_program_id)
+    except EducationalProgram.DoesNotExist:
+        return Response({'error': 'Образовательная программа не найдена'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        employee = Employee.objects.get(user=request.user)
+    except Employee.DoesNotExist:
+        return Response({'error': 'Сотрудник для текущего пользователя не найден'}, status=status.HTTP_400_BAD_REQUEST)
+
+    event_serializer = EventSerializer(data=event_data)
+    if not event_serializer.is_valid():
+        return Response(event_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    event = event_serializer.save(employee=employee)
+
+    ListsEvents.objects.create(educational_program=educational_program, event=event)
+
+    # Возвращаем сериализованные полные данные с информацией о сотруднике
+    output_serializer = EventSerializer(event)
+    return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def events_by_educational_program(request, educational_program_id):
+    if request.user.role not in ['Admin', 'Employee']:
+        return Response({'error': 'Доступ запрещён'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        educational_program = EducationalProgram.objects.get(id=educational_program_id)
+    except EducationalProgram.DoesNotExist:
+        return Response({'error': 'Образовательная программа не найдена'}, status=status.HTTP_404_NOT_FOUND)
+
+    event_ids = ListsEvents.objects.filter(educational_program=educational_program).values_list('event_id', flat=True)
+    events = Event.objects.filter(id__in=event_ids)
+
+    serializer = EventSerializer(events, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_event(request, event_id):
+    if request.user.role not in ['Parent', 'Employee']:
+        return Response({'error': 'Доступ запрещён'}, status=status.HTTP_403_FORBIDDEN)
+
+    event = get_object_or_404(Event, id=event_id)
+    serializer = EventSerializer(event)
+    return Response(serializer.data)
+
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def edit_event(request, event_id):
+    if request.user.role != 'Employee':
+        return Response({'error': 'Доступ запрещён'}, status=status.HTTP_403_FORBIDDEN)
+
+    event = get_object_or_404(Event, id=event_id)
+
+    partial = request.method == 'PATCH'
+
+    serializer = EventSerializer(event, data=request.data, partial=partial)
 
     if serializer.is_valid():
         serializer.save()

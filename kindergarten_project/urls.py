@@ -19,7 +19,7 @@ from django.urls import path
 from kindergarten_app_.views import register_user, user_login, add_employee, get_educational_program_by_id, \
     add_parent, list_parents, list_employees, get_parent_by_user_id, create_group, edit_parent, add_child, \
     get_employee_by_user_id, create_educational_program, list_groups, get_group_by_id, edit_group, edit_employee, \
-    get_child, edit_child
+    get_child, edit_child, assign_employee_role, add_event, events_by_educational_program, get_event, edit_event
 
 
 urlpatterns = [
@@ -43,4 +43,10 @@ urlpatterns = [
     path('api/child/add/', add_child, name='add_child'),
     path('api/child/<int:child_id>/', get_child, name='get_child'),
     path('api/child/edit/<int:child_id>/', edit_child, name='edit_child'),
+    path('api/group/role/', assign_employee_role, name='assign_employee_role'),
+    path('api/event/add/', add_event, name='create_event'),
+    path('api/events/educational_program/<int:educational_program_id>/', events_by_educational_program, name='events_by_educational_program'),
+    path('api/event/<int:event_id>/', get_event, name='view_event_by_id_for_parent'),
+    path('api/event/edit/<int:event_id>/', edit_event, name='edit_event'),
+
 ]
