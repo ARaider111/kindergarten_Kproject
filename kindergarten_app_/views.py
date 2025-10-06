@@ -493,3 +493,54 @@ def add_child_to_event_participants(request):
 
     serializer = ListParticipantsSerializer(participant)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def participants_list_by_event(request, event_id):
+    if request.user.role != 'Employee':
+        return Response({'error': 'Доступ запрещён'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        event = Event.objects.get(id=event_id)
+    except Event.DoesNotExist:
+        return Response({'error': 'Мероприятие не найдено'}, status=status.HTTP_404_NOT_FOUND)
+
+    participants = ListParticipants.objects.filter(event=event)
+    serializer = ListParticipantsSerializer(participants, many=True)
+    return Response(serializer.data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    user = request.user
+
+    old_password = request.data.get('old_password')
+    new_password = request.data.get('new_password')
+    new_password_confirm = request.data.get('new_password_confirm')
+
+    if not old_password or not new_password or not new_password_confirm:
+        return Response({'error': 'Все поля обязательны'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if new_password != new_password_confirm:
+        return Response({'error': 'Новый пароль и подтверждение не совпадают'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not user.check_password(old_password):
+        return Response({'error': 'Старый пароль указан неверно'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Можно добавить проверку сложности пароля и другие валидации
+
+    user.set_password(new_password)
+    user.save()
+
+    return Response({'success': 'Пароль успешно изменен'}, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout_view(request):
+    try:
+        # Удаляем токен текущего пользователя
+        token = Token.objects.get(user=request.user)
+        token.delete()
+        return Response({'message': 'Вы успешно вышли из аккаунта'}, status=status.HTTP_200_OK)
+    except Token.DoesNotExist:
+        return Response({'error': 'Токен не найден'}, status=status.HTTP_400_BAD_REQUEST)

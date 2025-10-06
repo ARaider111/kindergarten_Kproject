@@ -17,9 +17,9 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from kindergarten_app_.views import register_user, user_login, add_employee, get_educational_program_by_id, \
-    add_parent, list_parents, list_employees, get_parent_by_user_id, create_group, edit_parent, add_child, \
+    add_parent, list_parents, list_employees, get_parent_by_user_id, create_group, edit_parent, add_child, logout_view,\
     get_employee_by_user_id, create_educational_program, list_groups, get_group_by_id, edit_group, edit_employee, \
-    get_child, edit_child, assign_employee_role, add_event,\
+    get_child, edit_child, assign_employee_role, add_event, participants_list_by_event, change_password,\
     events_by_educational_program, get_event, edit_event, get_events_by_parent, get_group_by_parent, add_child_to_event_participants
 
 
@@ -52,6 +52,9 @@ urlpatterns = [
     path('api/events/group/', get_events_by_parent, name='events_by_parent_children_groups'),
     path('api/groups/children/', get_group_by_parent, name='group_info_by_parent_children'),
     path('api/event_participants/add/', add_child_to_event_participants, name='add_child_to_additional_event'),
+    path('api/event/<int:event_id>/participants/', participants_list_by_event, name='participants_list_by_event'),
+    path('api/change-password/', change_password, name='change_password'),
+    path('api/logout/', logout_view, name='logout'),
 
 
 ]
