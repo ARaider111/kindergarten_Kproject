@@ -6,8 +6,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
 from .models import User, Employee, Parent, EducationalProgram, Group, Child, ParentsChilds, \
-    AssignedEmployees, QualificationEmployees, ListsEvents, Event
-from .serializers import UserSerializer, EmployeeSerializer, AssignedEmployeesSerializer, EventSerializer,\
+    AssignedEmployees, QualificationEmployees, ListsEvents, Event, ListParticipants
+from .serializers import UserSerializer, EmployeeSerializer, AssignedEmployeesSerializer, EventSerializer, ListParticipantsSerializer,\
     ParentSerializer, EducationalProgramSerializer, GroupSerializer, ChildSerializer, MedicalContraindicationsChildSerializer
 from django.shortcuts import get_object_or_404
 
@@ -403,3 +403,93 @@ def edit_event(request, event_id):
         return Response(serializer.data)
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_events_by_parent(request):
+    if request.user.role != 'Parent':
+        return Response({'error': 'Доступ запрещён'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        parent = request.user.parent
+    except AttributeError:
+        return Response({'error': 'Родитель не определён'}, status=status.HTTP_400_BAD_REQUEST)
+
+    child_ids = ParentsChilds.objects.filter(parent=parent).values_list('child_id', flat=True)
+    if not child_ids:
+        return Response({'error': 'У родителя нет детей'}, status=status.HTTP_404_NOT_FOUND)
+
+    group_ids = Child.objects.filter(id__in=child_ids).values_list('group_id', flat=True).distinct()
+
+    # Получаем образовательные программы, связанные с этими группами, если есть связь
+    # Пример для модели ListsEvents с правильным related_name - возможно 'listsevents' или 'listevents_set'
+    educational_program_ids = EducationalProgram.objects.filter(
+        group__id__in=group_ids
+    ).values_list('id', flat=True)
+
+    # В фильтре обратный ключ к Events через field related_name в ListsEvents. Уточните spelling related_name
+    events = Event.objects.filter(
+        listsevents__educational_program__id__in=educational_program_ids
+    ).distinct()
+
+    serializer = EventSerializer(events, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_group_by_parent(request):
+    if request.user.role != 'Parent':
+        return Response({'error': 'Доступ запрещён'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        parent = request.user.parent
+    except AttributeError:
+        return Response({'error': 'Родитель не определён'}, status=status.HTTP_400_BAD_REQUEST)
+
+    child_ids = ParentsChilds.objects.filter(parent=parent).values_list('child_id', flat=True)
+    if not child_ids:
+        return Response({'error': 'У родителя нет детей'}, status=status.HTTP_404_NOT_FOUND)
+
+    groups = Group.objects.filter(child__id__in=child_ids).distinct()
+    if not groups:
+        return Response({'error': 'Группы не найдены'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = GroupSerializer(groups, many=True)
+    return Response(serializer.data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def add_child_to_event_participants(request):
+    if request.user.role != 'Parent':
+        return Response({'error': 'Доступ запрещён'}, status=status.HTTP_403_FORBIDDEN)
+
+    parent = getattr(request.user, 'parent', None)
+    if not parent:
+        return Response({'error': 'Родитель не определён'}, status=status.HTTP_400_BAD_REQUEST)
+
+    child_id = request.data.get('child_id')
+    event_id = request.data.get('event_id')
+
+    if not child_id or not event_id:
+        return Response({'error': 'Не переданы необходимые параметры child_id и event_id'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Проверяем, что ребенок принадлежит родителю
+    if not ParentsChilds.objects.filter(parent=parent, child_id=child_id).exists():
+        return Response({'error': 'Ребенок не найден или не принадлежит этому родителю'}, status=status.HTTP_403_FORBIDDEN)
+
+    # Проверяем существование мероприятия
+    try:
+        event = Event.objects.get(id=event_id)
+    except Event.DoesNotExist:
+        return Response({'error': 'Мероприятие не найдено'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Проверяем, что такой участник еще не добавлен
+    if ListParticipants.objects.filter(event=event, child_id=child_id).exists():
+        return Response({'error': 'Ребенок уже добавлен в список участников мероприятия'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Создаём запись
+    participant = ListParticipants.objects.create(event=event, child_id=child_id)
+
+    serializer = ListParticipantsSerializer(participant)
+    return Response(serializer.data, status=status.HTTP_201_CREATED)

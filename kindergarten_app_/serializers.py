@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import User, Employee, Parent, Event,\
-    EducationalProgram, Group, Child, MedicalContraindicationsChild, AssignedEmployees
+    EducationalProgram, Group, Child, MedicalContraindicationsChild, AssignedEmployees, ListParticipants
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -37,14 +37,16 @@ class ParentSerializer(serializers.ModelSerializer):
         return Parent.objects.create(user=user, **validated_data)
 
 class EducationalProgramSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = EducationalProgram
-        fields = '__all__'
+        fields = ['id', 'description', 'age_category_children']
 
 class GroupSerializer(serializers.ModelSerializer):
+    educational_program = EducationalProgramSerializer(read_only=True)
     class Meta:
         model = Group
-        fields = '__all__'
+        fields = ['id', 'name', 'age_group', 'count_children', 'educational_program']
 
 class MedicalContraindicationsChildSerializer(serializers.ModelSerializer):
     class Meta:
@@ -89,3 +91,10 @@ class EventSerializer(serializers.ModelSerializer):
         model = Event
         fields = ['id', 'name', 'date_event', 'employee', 'count_participants']
         read_only_fields = ['employee']
+
+class ListParticipantsSerializer  (serializers.ModelSerializer):
+    child = ChildSerializer(read_only=True)
+    event = EventSerializer(read_only=True)
+    class Meta:
+        model = ListParticipants
+        fields = ['id', 'event', 'child']

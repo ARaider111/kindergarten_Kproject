@@ -149,17 +149,9 @@ class AssignedEmployees(models.Model):
     class Meta:
         unique_together = ('group', 'employee')
 
-class AdditionalEvent(models.Model):
-    # Для модели Additional_events нужно добавить поля по структуре, если предусматривается
-
-    # Пример (замените на реальные поля):
-    name = models.CharField(max_length=50)
-    date = models.DateTimeField()
-    # и связь с Event или Employee, если нужно
-
 class ListParticipants(models.Model):
-    additional_event = models.ForeignKey(AdditionalEvent, on_delete=models.CASCADE)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE)
     child = models.ForeignKey(Child, on_delete=models.CASCADE)
 
     class Meta:
-        unique_together = ('additional_event', 'child')
+        unique_together = ('event', 'child')
